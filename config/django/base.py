@@ -18,6 +18,7 @@ LOCAL_APPS = [
     'hattrick.common.apps.CommonConfig',
     'hattrick.users.apps.UsersConfig',
     'hattrick.authentication.apps.AuthenticationConfig',
+    'hattrick.news.apps.NewsConfig',
 ]
 
 THIRD_PARTY_APPS = [
