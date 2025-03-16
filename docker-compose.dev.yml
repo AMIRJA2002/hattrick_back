@@ -8,7 +8,7 @@ services:
     environment:
       - POSTGRES_DB=hattrick
       - POSTGRES_USER=hattrick
-      - POSTGRES_PASSWORD=hattrickdatabasepassword##@!$#*$^@*$(#*
+      - POSTGRES_PASSWORD=dbpass
     volumes:
       - postgres-data:/var/lib/postgresql/data/
 
@@ -38,6 +38,7 @@ services:
       - 6379:6379
     volumes:
       - redis-data:/data
+    command: ["redis-server", "--requirepass", "redispass"]
 
 
 volumes:

@@ -1,69 +1,66 @@
-from rest_framework import status
+from django.db.models import Q
+
+from hattrick.users.services import register, RegisterFactoryService, cache_user_email_and_otp, register_confirm
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
+from ..utils.messages import Message
+from rest_framework import status
+from django.contrib.auth import get_user_model
+import random
 
-from django.core.validators import MinLengthValidator
-from .validators import number_validator, special_char_validator, letter_validator
-from hattrick.users.models import BaseUser , Profile
-from hattrick.api.mixins import ApiAuthMixin
-from hattrick.users.selectors import get_profile
-from hattrick.users.services import register 
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from ..utils.redis_conn import redis_conn
 
-from drf_spectacular.utils import extend_schema
-
-
-class ProfileApi(ApiAuthMixin, APIView):
-
-    class OutPutSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = Profile 
-            fields = ("bio", "posts_count", "subscriber_count", "subscription_count")
-
-    @extend_schema(responses=OutPutSerializer)
-    def get(self, request):
-        query = get_profile(user=request.user)
-        return Response(self.OutPutSerializer(query, context={"request":request}).data)
+User = get_user_model()
 
 
 class RegisterApi(APIView):
+    class RegisterInputSerializer(serializers.Serializer):
+        email = serializers.EmailField(required=False)
+        phone = serializers.CharField(max_length=11, required=False)
 
+    def post(self, request):
+        serializer = self.RegisterInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        code = random.randint(100000, 999999)
 
-    class InputRegisterSerializer(serializers.Serializer):
-        email = serializers.EmailField(max_length=255)
-        bio = serializers.CharField(max_length=1000, required=False)
-        password = serializers.CharField(
-                validators=[
-                        number_validator,
-                        letter_validator,
-                        special_char_validator,
-                        MinLengthValidator(limit_value=10)
-                    ]
-                )
-        confirm_password = serializers.CharField(max_length=255)
+        email = serializer.validated_data.get('email')
+        phone = serializer.validated_data.get('phone')
         
-        def validate_email(self, email):
-            if BaseUser.objects.filter(email=email).exists():
-                raise serializers.ValidationError("email Already Taken")
-            return email
+        if email and User.objects.filter(email=email).exists():
+                return Response(Message.email_exists_message(), status=status.HTTP_400_BAD_REQUEST)
 
-        def validate(self, data):
-            if not data.get("password") or not data.get("confirm_password"):
-                raise serializers.ValidationError("Please fill password and confirm password")
-            
-            if data.get("password") != data.get("confirm_password"):
-                raise serializers.ValidationError("confirm password is not equal to password")
-            return data
+        if phone and User.objects.filter(phone=phone).exists():
+            return Response(Message.phone_exists_message(), status=status.HTTP_400_BAD_REQUEST)
 
 
-    class OutPutRegisterSerializer(serializers.ModelSerializer):
+        response = RegisterFactoryService.send_code(data=serializer.validated_data, code=code)
 
-        token = serializers.SerializerMethodField("get_token")
+        if response == 'email':
+            cache_user_email_and_otp(serializer.validated_data['email'], code, 60 * 2)
+            return Response(Message.email_register_message(), status=status.HTTP_201_CREATED)
+
+        if response == 'phone':
+            cache_user_email_and_otp(serializer.validated_data['phone'], code)
+            return Response(Message.phone_register_message(), status=status.HTTP_201_CREATED)
+
+        return Response(Message.register_bad_request(), status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterConfirmApi(APIView):
+    class RegisterConfirmInputSerializer(serializers.Serializer):
+        email = serializers.EmailField(required=False)
+        phone = serializers.CharField(max_length=11, required=False)
+        code = serializers.CharField(required=True)
+
+    class RegisterConfirmOutputSerializer(serializers.ModelSerializer):
+        token = serializers.SerializerMethodField()
 
         class Meta:
-            model = BaseUser 
-            fields = ("email", "token", "created_at", "updated_at")
+            model = User
+            fields = ['id', 'email', 'phone_number', 'created_at', 'token']
 
         def get_token(self, user):
             data = dict()
@@ -76,21 +73,95 @@ class RegisterApi(APIView):
 
             return data
 
-
-    @extend_schema(request=InputRegisterSerializer, responses=OutPutRegisterSerializer)
     def post(self, request):
-        serializer = self.InputRegisterSerializer(data=request.data)
+        serializer = self.RegisterConfirmInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            user = register(
-                    email=serializer.validated_data.get("email"),
-                    password=serializer.validated_data.get("password"),
-                    bio=serializer.validated_data.get("bio"),
-                    )
-        except Exception as ex:
-            return Response(
-                    f"Database Error {ex}",
-                    status=status.HTTP_400_BAD_REQUEST
-                    )
-        return Response(self.OutPutRegisterSerializer(user, context={"request":request}).data)
 
+        validated_data = serializer.validated_data
+        contact_field = "email" if validated_data.get("email") else "phone"
+
+        if not validated_data.get(contact_field):
+            return Response(Message.register_bad_request(), status=status.HTTP_400_BAD_REQUEST)
+
+        response = register_confirm(code=validated_data['code'], email_or_phone=validated_data[contact_field])
+
+        if not response:
+            return Response(Message.invalid_otp(), status=status.HTTP_400_BAD_REQUEST)
+
+        user = register(email=serializer.validated_data['email'], phone_number=serializer.validated_data['phone'])
+        redis_conn.delete(serializer.validated_data['email'])
+        return Response(self.RegisterConfirmOutputSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class LoginApi(APIView):
+    class LoginInputSerializer(serializers.Serializer):
+        email = serializers.EmailField(required=False)
+        phone = serializers.CharField(max_length=11, required=False)
+
+
+    def post(self, request):
+        serializer = self.LoginInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        code = random.randint(100000, 999999)
+
+        response = RegisterFactoryService.send_code(data=serializer.validated_data, code=code)
+
+        if response == 'email':
+            cache_user_email_and_otp(serializer.validated_data['email'], code, 60 * 2)
+            return Response(Message.email_register_message(), status=status.HTTP_201_CREATED)
+
+        if response == 'phone':
+            cache_user_email_and_otp(serializer.validated_data['phone'], code)
+            return Response(Message.phone_register_message(), status=status.HTTP_201_CREATED)
+
+        return Response(Message.register_bad_request(), status=status.HTTP_400_BAD_REQUEST)
+
+class ConfirmLoginApi(APIView):
+    class LoginConfirmInputSerializer(serializers.Serializer):
+        email = serializers.EmailField(required=False)
+        phone = serializers.CharField(max_length=11, required=False)
+        code = serializers.CharField(required=True)
+
+
+    class LoginConfirmOutputSerializer(serializers.ModelSerializer):
+        token = serializers.SerializerMethodField()
+
+        class Meta:
+            model = User
+            fields = ['id', 'email', 'phone_number', 'created_at', 'token']
+
+        def get_token(self, user):
+            data = dict()
+            token_class = RefreshToken
+
+            refresh = token_class.for_user(user)
+
+            data["refresh"] = str(refresh)
+            data["access"] = str(refresh.access_token)
+
+            return data
+
+    def post(self, request):
+        serializer = self.LoginConfirmInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        contact_field = "email" if validated_data.get("email") else "phone"
+
+        if not validated_data.get(contact_field):
+            return Response(Message.register_bad_request(), status=status.HTTP_400_BAD_REQUEST)
+
+        response = register_confirm(code=validated_data['code'], email_or_phone=validated_data[contact_field])
+
+        if not response:
+            return Response(Message.invalid_otp(), status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(
+            Q(email=serializer.validated_data['email']) | Q(phone_number=serializer.validated_data['phone'])
+        ).first()
+
+        if not user:
+            return Response(Message.user_not_found(), status=status.HTTP_404_NOT_FOUND)
+
+        redis_conn.delete(serializer.validated_data[contact_field])
+        return Response(self.LoginConfirmOutputSerializer(user).data, status=status.HTTP_201_CREATED)

@@ -80,7 +80,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
-    'default': env.db('DATABASE_URL', default='psql://hattrick:hattrickdatabasepassword##@!$#*$^@*$(#*@127.0.0.1:5432/hattrick'),
+    'default': env.db('DATABASE_URL', default='psql://hattrick:dbpass@postgres/hattrick'),
 }
 DATABASES['default']['ATOMIC_REQUESTS'] = True
 
@@ -90,7 +90,7 @@ if os.environ.get('GITHUB_WORKFLOW'):
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': 'github_actions',
             'USER': 'hattrick',
-            'PASSWORD': 'hattrickdatabasepassword##@!$#*$^@*$(#*',
+            'PASSWORD': 'dbpass',
             'HOST': '127.0.0.1',
             'PORT': '5432',
         }
@@ -169,4 +169,6 @@ from config.settings.sessions import *  # noqa
 from config.settings.celery import *  # noqa
 from config.settings.swagger import *  # noqa
 #from config.settings.sentry import *  # noqa
-#from config.settings.email_sending import *  # noqa
+from config.settings.email_sending import *  # noqa
+
+# EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
