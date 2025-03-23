@@ -67,6 +67,7 @@ class NewsMedia(BaseModel):
     news = models.ForeignKey(News, on_delete=models.CASCADE, related_name='medias')
     file = models.FileField(upload_to="news_media/")
     media_type = models.CharField(max_length=10, choices=[("image", "Image"), ("video", "Video")])  # نوع رسانه
+    is_head_page = models.BooleanField(default=False)
 
     def __str__(self):
         return self.file.name

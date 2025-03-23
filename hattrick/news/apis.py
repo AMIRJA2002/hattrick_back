@@ -44,10 +44,6 @@ class NewsApi(APIView):
             return [tag.slug for tag in obj.tags.all()]
 
     @extend_schema(
-        parameters=[
-            OpenApiParameter(name='id', description='News ID', required=False, type=int),
-            OpenApiParameter(name='slug', description='News Slug', required=False, type=str),
-        ],
         responses={200: NewsOutputSerializer}
     )
     def get(self, request, id: int = None, slug: str = None):
@@ -184,3 +180,8 @@ class CommentInteractionApi(APIView):
             daemon=True,
         ).start()
         return Response(Message.comment_interaction_save())
+
+
+class FeaturedNews(APIView):
+    def get(self, requests):
+        pass
