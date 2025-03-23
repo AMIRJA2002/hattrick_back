@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer, OpenApiParameter
 from hattrick.news.serializers import NewMediaSerializer, CategorySerializer
 from hattrick.news.models import News, Comment, CommentInteraction
 from rest_framework.permissions import IsAuthenticated
@@ -42,6 +43,13 @@ class NewsApi(APIView):
             # Extract only the slugs from the tags and return as a list
             return [tag.slug for tag in obj.tags.all()]
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='id', description='News ID', required=False, type=int),
+            OpenApiParameter(name='slug', description='News Slug', required=False, type=str),
+        ],
+        responses={200: NewsOutputSerializer}
+    )
     def get(self, request, id: int = None, slug: str = None):
         news: News = get_news_by_id(id) if id else get_news_by_slug(slug)
         threading.Thread(target=increase_news_view, args=(news,)).start()
@@ -51,6 +59,16 @@ class NewsApi(APIView):
 
 class NewsInteraction(APIView):
     # TODO: we should add unanimous user log for prevent like more than once
+
+    @extend_schema(
+        request=inline_serializer(
+            name="NewsInteractionRequest",
+            fields={
+                'slug': serializers.CharField()
+            }
+        ),
+        responses={201: OpenApiResponse(description='Interaction Created')}
+    )
     def post(self, request, slug: str):
         create_news_interaction(request.user, slug)
         return Response(Message.news_interaction(), status=status.HTTP_201_CREATED)
@@ -83,6 +101,7 @@ class CommentApi(APIView):
         def get_replies_count(self, obj):
             return obj.get_descendant_count()
 
+    @extend_schema(request=CommentInputSerializer, responses={201: CommentOutputSerializer})
     def post(self, request):
         serializer = self.CommentInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -95,10 +114,12 @@ class CommentApi(APIView):
         )
         return Response(self.CommentOutputSerializer(instance=comment).data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(responses={200: CommentOutputSerializer(many=True)})
     def get(self, request, id: int):
         comments = get_news_comments_by_id(id=id)
         return Response(self.CommentOutputSerializer(instance=comments, many=True).data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=CommentUpdateInputSerializer, responses={200: CommentOutputSerializer})
     def patch(self, request, id: int):
         serializer = self.CommentUpdateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -109,6 +130,7 @@ class CommentApi(APIView):
         )
         return Response(self.CommentOutputSerializer(instance=comment).data, status=status.HTTP_200_OK)
 
+    @extend_schema(responses={204: OpenApiResponse(description='Comment Deleted')})
     def delete(self, request, id: int):
         threading.Thread(target=delete_comment_by_id, kwargs={'id': id, 'user': request.user}).start()
         return Response(Message.comment_deleted_message(), status=status.HTTP_204_NO_CONTENT)
@@ -123,6 +145,7 @@ class CommentReply(APIView):
             model = Comment
             fields = ('user', 'content', 'parent', 'likes', 'dislikes')
 
+    @extend_schema(responses={200: CommentReplyOutputSerialize(many=True)})
     def get(self, request, id: int):
         comments = get_comments_reply_by_id(id)
         return Response(self.CommentReplyOutputSerialize(instance=comments, many=True).data, status=status.HTTP_200_OK)
@@ -145,6 +168,8 @@ class CommentInteractionApi(APIView):
 
             return data
 
+    @extend_schema(request=CommentInteractionSerializer,
+                   responses={201: OpenApiResponse(description='Interaction Saved')})
     def post(self, request):
         serializer = self.CommentInteractionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -21,6 +21,11 @@ class RegisterApi(APIView):
         email = serializers.EmailField(required=False)
         phone = serializers.CharField(max_length=11, required=False)
 
+    @extend_schema(
+        request=RegisterInputSerializer,
+        responses={201: Message.email_register_message(), 400: Message.register_bad_request()},
+        description="ارسال کد تأیید برای ثبت‌نام با ایمیل یا شماره تلفن"
+    )
     def post(self, request):
         serializer = self.RegisterInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -28,13 +33,12 @@ class RegisterApi(APIView):
 
         email = serializer.validated_data.get('email')
         phone = serializer.validated_data.get('phone')
-        
+
         if email and User.objects.filter(email=email).exists():
-                return Response(Message.email_exists_message(), status=status.HTTP_400_BAD_REQUEST)
+            return Response(Message.email_exists_message(), status=status.HTTP_400_BAD_REQUEST)
 
         if phone and User.objects.filter(phone=phone).exists():
             return Response(Message.phone_exists_message(), status=status.HTTP_400_BAD_REQUEST)
-
 
         response = RegisterFactoryService.send_code(data=serializer.validated_data, code=code)
 
@@ -73,6 +77,12 @@ class RegisterConfirmApi(APIView):
 
             return data
 
+    @extend_schema(
+        request=RegisterConfirmInputSerializer,
+        responses={201: RegisterConfirmOutputSerializer, 400: Message.invalid_otp()},
+        summary="تایید ثبت‌نام",
+        description="کاربر کد تایید دریافت شده را وارد می‌کند و در صورت صحت، حساب کاربری ایجاد می‌شود.",
+    )
     def post(self, request):
         serializer = self.RegisterConfirmInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -98,7 +108,12 @@ class LoginApi(APIView):
         email = serializers.EmailField(required=False)
         phone = serializers.CharField(max_length=11, required=False)
 
-
+    @extend_schema(
+        request=LoginInputSerializer,
+        responses={201: Message.email_register_message(), 400: Message.register_bad_request()},
+        summary="درخواست ورود",
+        description="کاربر با ایمیل یا شماره تلفن خود درخواست ورود می‌دهد و یک کد تایید دریافت می‌کند.",
+    )
     def post(self, request):
         serializer = self.LoginInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -116,12 +131,12 @@ class LoginApi(APIView):
 
         return Response(Message.register_bad_request(), status=status.HTTP_400_BAD_REQUEST)
 
+
 class ConfirmLoginApi(APIView):
     class LoginConfirmInputSerializer(serializers.Serializer):
         email = serializers.EmailField(required=False)
         phone = serializers.CharField(max_length=11, required=False)
         code = serializers.CharField(required=True)
-
 
     class LoginConfirmOutputSerializer(serializers.ModelSerializer):
         token = serializers.SerializerMethodField()
@@ -141,6 +156,12 @@ class ConfirmLoginApi(APIView):
 
             return data
 
+    @extend_schema(
+        request=LoginConfirmInputSerializer,
+        responses={201: LoginConfirmOutputSerializer, 400: Message.invalid_otp()},
+        summary="تایید ورود",
+        description="کاربر کد دریافت شده را وارد می‌کند و در صورت صحت، به سیستم وارد می‌شود.",
+    )
     def post(self, request):
         serializer = self.LoginConfirmInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -168,6 +189,11 @@ class ConfirmLoginApi(APIView):
 
 
 class EasyJwt(APIView):
+    @extend_schema(
+        responses={200: dict(refresh=str, access=str)},
+        summary="دریافت توکن JWT برای تست",
+        description="یک کاربر مشخص را پیدا کرده و توکن‌های احراز هویت JWT را برای او برمی‌گرداند.",
+    )
     def get(self, request):
         user = User.objects.get(phone_number='09190257536')
         data = dict()
