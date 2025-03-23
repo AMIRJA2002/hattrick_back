@@ -80,7 +80,6 @@ class RegisterConfirmApi(APIView):
     @extend_schema(
         request=RegisterConfirmInputSerializer,
         responses={201: RegisterConfirmOutputSerializer, 400: Message.invalid_otp()},
-        summary="تایید ثبت‌نام",
         description="کاربر کد تایید دریافت شده را وارد می‌کند و در صورت صحت، حساب کاربری ایجاد می‌شود.",
     )
     def post(self, request):
@@ -111,7 +110,6 @@ class LoginApi(APIView):
     @extend_schema(
         request=LoginInputSerializer,
         responses={201: Message.email_register_message(), 400: Message.register_bad_request()},
-        summary="درخواست ورود",
         description="کاربر با ایمیل یا شماره تلفن خود درخواست ورود می‌دهد و یک کد تایید دریافت می‌کند.",
     )
     def post(self, request):
@@ -159,7 +157,6 @@ class ConfirmLoginApi(APIView):
     @extend_schema(
         request=LoginConfirmInputSerializer,
         responses={201: LoginConfirmOutputSerializer, 400: Message.invalid_otp()},
-        summary="تایید ورود",
         description="کاربر کد دریافت شده را وارد می‌کند و در صورت صحت، به سیستم وارد می‌شود.",
     )
     def post(self, request):
@@ -189,11 +186,11 @@ class ConfirmLoginApi(APIView):
 
 
 class EasyJwt(APIView):
-    @extend_schema(
-        responses={200: dict(refresh=str, access=str)},
-        summary="دریافت توکن JWT برای تست",
-        description="یک کاربر مشخص را پیدا کرده و توکن‌های احراز هویت JWT را برای او برمی‌گرداند.",
-    )
+    # @extend_schema(
+    #     responses={200: dict(refresh=str, access=str)},
+    #     summary="دریافت توکن JWT برای تست",
+    #     description="یک کاربر مشخص را پیدا کرده و توکن‌های احراز هویت JWT را برای او برمی‌گرداند.",
+    # )
     def get(self, request):
         user = User.objects.get(phone_number='09190257536')
         data = dict()
