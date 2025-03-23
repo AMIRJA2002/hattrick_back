@@ -1,3 +1,6 @@
+from django.contrib.admin.templatetags.admin_modify import submit_row_tag
+
+
 class Message:
     @staticmethod
     def phone_register_message():
@@ -34,3 +37,19 @@ class Message:
     @staticmethod
     def user_not_found():
         return {'msg': 'user not found'}
+
+    @staticmethod
+    def news_interaction():
+        return {'msg': 'user liked this post!'}
+
+    @staticmethod
+    def comment_deleted_message():
+        return {'msg': 'comment deleted!'}
+
+    @staticmethod
+    def comment_interaction_both_field_ture_error():
+        return 'one field should be ture'
+
+    @staticmethod
+    def comment_interaction_save():
+        return {'msg': 'interaction saved!'}

@@ -165,3 +165,17 @@ class ConfirmLoginApi(APIView):
 
         redis_conn.delete(serializer.validated_data[contact_field])
         return Response(self.LoginConfirmOutputSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class EasyJwt(APIView):
+    def get(self, request):
+        user = User.objects.get(phone_number='09190257536')
+        data = dict()
+        token_class = RefreshToken
+
+        refresh = token_class.for_user(user)
+
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+
+        return Response(data)

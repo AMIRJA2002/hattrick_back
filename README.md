@@ -37,4 +37,4 @@ docker compose -f docker-compose.dev.yml up -d
 7- run the project
 ```
 python manage.py runserver
-```
+```# hattrick_back
