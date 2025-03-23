@@ -1,5 +1,5 @@
 from django.urls import path
-from .apis import NewsApi, NewsInteraction, CommentApi, CommentReply, CommentInteractionApi
+from .apis import NewsApi, NewsInteraction, CommentApi, CommentReply, CommentInteractionApi, FeaturedNewsApi, NewsList
 
 app_name = 'news'
 
@@ -10,6 +10,8 @@ urlpatterns = [
     path('comment/<int:id>/', CommentApi.as_view(), name="delete-comment"),
     path('replies/<int:id>/', CommentReply.as_view(), name="replies"),
     path('comment/interaction/', CommentInteractionApi.as_view(), name="comment-interaction"),
+    path('featured/', FeaturedNewsApi.as_view(), name="featured"),
+    path('list/', NewsList.as_view(), name="list"),
     path('<int:id>/', NewsApi.as_view(), name="news-by-id"),
     path('<slug:slug>/', NewsApi.as_view(), name="news-by-slug"),
     path('like/<slug:slug>/', NewsInteraction.as_view(), name="interaction"),

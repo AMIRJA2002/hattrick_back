@@ -1,3 +1,5 @@
+import json
+
 from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer, OpenApiParameter
 from hattrick.news.serializers import NewMediaSerializer, CategorySerializer
 from hattrick.news.models import News, Comment, CommentInteraction
@@ -15,7 +17,7 @@ from hattrick.news.selectors import (
     update_comment_by_id,
     delete_comment_by_id,
     get_news_comments_by_id,
-    get_comments_reply_by_id,
+    get_comments_reply_by_id, featured_news_list, get_news_list,
 )
 from hattrick.news.services import (
     increase_news_view,
@@ -182,6 +184,28 @@ class CommentInteractionApi(APIView):
         return Response(Message.comment_interaction_save())
 
 
-class FeaturedNews(APIView):
-    def get(self, requests):
-        pass
+class FeaturedNewsApi(APIView):
+
+    def get(self, request):
+        news = featured_news_list('featured_news')
+        news = [json.loads(item) for item in news]
+        return Response(*news, status=status.HTTP_200_OK)
+
+
+class NewsList(APIView):
+    class FeaturedNewsOutputSerializer(serializers.ModelSerializer):
+        image_url = serializers.URLField()
+        user_data = serializers.CharField()
+
+        class Meta:
+            model = News
+            fields = ('id', 'title', 'published_at', 'image_url', 'user_data')
+
+        # def get_user(self, obg):
+        #     return obg.author.user.phone_number
+
+    def get(self, request):
+        news = get_news_list()
+        for i in news:
+            print(i)
+        return Response(self.FeaturedNewsOutputSerializer(instance=news, many=True).data, status=status.HTTP_200_OK)

@@ -1,8 +1,10 @@
-from rest_framework.generics import get_object_or_404
-from django.db.models import Count, Q, QuerySet
-from django.contrib.auth import get_user_model
+from typing import Set, Dict
 
-from .models import News, Comment
+from rest_framework.generics import get_object_or_404
+from django.db.models import Count, Q, QuerySet, Subquery, OuterRef, Prefetch
+from django.contrib.auth import get_user_model
+from .models import News, Comment, NewsMedia
+from hattrick.utils.redis_conn import redis_conn
 
 User = get_user_model()
 
@@ -49,3 +51,16 @@ def get_comments_reply_by_id(id: int) -> QuerySet[Comment]:
         likes=Count('interactions', filter=Q(interactions__liked=True)),
         dislikes=Count('interactions', filter=Q(interactions__disliked=True)),
     )
+
+
+def featured_news_list(key: str) -> list[Dict[str, any]]:
+    return redis_conn.get_set_by_key(key)
+
+
+def get_news_list() -> QuerySet[News]:
+    return (News.objects.defer('created_at', 'updated_at', 'slug', 'summary', 'category_id', 'views', 'is_featured', 'is_published').prefetch_related(
+        'medias'
+    ).annotate(
+        image_url=Subquery(NewsMedia.objects.filter(news=OuterRef('pk'), is_head_page=True).values('file')),
+        user_data=Subquery(User.objects.filter(id=OuterRef('author__pk')).values('phone_number')),
+    ).filter(is_published=True, is_featured=True))
