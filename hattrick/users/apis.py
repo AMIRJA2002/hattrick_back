@@ -1,17 +1,15 @@
-from django.db.models import Q
-
 from hattrick.users.services import register, RegisterFactoryService, cache_user_email_and_otp, register_confirm
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken
+from hattrick.utils.redis_conn import redis_conn
 from drf_spectacular.utils import extend_schema
+from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import serializers
 from ..utils.messages import Message
 from rest_framework import status
-from django.contrib.auth import get_user_model
+from django.db.models import Q
 import random
-
-from ..utils.redis_conn import redis_conn
 
 User = get_user_model()
 

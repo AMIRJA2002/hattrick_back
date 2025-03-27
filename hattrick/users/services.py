@@ -28,6 +28,10 @@ def cache_user_email_and_otp(email, otp, ttl=None):
     threading.Thread(target=redis_conn.set, args=(email, otp, ttl)).start()
 
 
+def cache_user_phone_and_otp(phone, otp, ttl=None):
+    threading.Thread(target=redis_conn.set, args=(phone, otp, ttl)).start()
+
+
 def create_profile(*, user: BaseUser) -> Profile:
     return Profile.objects.create(user=user)
 
@@ -44,7 +48,8 @@ def create_user(*, email: str, phone_number: str) -> BaseUser:
 
 @transaction.atomic
 def register(*, email: str, phone_number: str) -> BaseUser:
-    user = create_user(email=email, phone_number=phone_number)
-    create_profile(user=user)
+    user, created = BaseUser.objects.get_or_create(email=email, phone_number=phone_number)
+    if not created:
+        create_profile(user=user)
 
     return user
